@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carte - Ouverture à la concurrence du rail français</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+        .info {
+            padding: 6px 8px;
+            background: white;
+            background: rgba(255,255,255,0.95);
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            border-radius: 5px;
+            max-width: 350px;
+        }
+        .info h4 {
+            margin: 0 0 5px;
+            color: #333;
+            font-size: 16px;
+        }
+        .info p {
+            margin: 5px 0;
+            font-size: 13px;
+        }
+        .legend {
+            line-height: 24px;
+            color: #555;
+            background: white;
+            background: rgba(255,255,255,0.95);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+        }
+        .legend h4 {
+            margin: 0 0 10px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .legend i {
+            width: 30px;
+            height: 3px;
+            float: left;
+            margin-right: 8px;
+            margin-top: 10px;
+        }
+        .legend .item {
+            margin: 5px 0;
+            font-size: 12px;
+        }
+        .title {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: white;
+            padding: 15px 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .title h1 {
+            margin: 0;
+            font-size: 20px;
+            color: #2c3e50;
+        }
+        .title p {
+            margin: 5px 0 0;
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+        .stats {
+            position: absolute;
+            bottom: 20px;
+            left: 10px;
+            z-index: 1000;
+            background: white;
+            background: rgba(255,255,255,0.95);
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            font-size: 12px;
+        }
+        .stats h4 {
+            margin: 0 0 10px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .stats .stat-item {
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+        .stats .stat-value {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="title">
+        <h1>🚆 Ouverture à la concurrence du rail français</h1>
+        <p>Lignes TER et TET (hors Île-de-France et Corse) - Source: Contexte, 17/11/2025</p>
+    </div>
+    
+    <div id="map"></div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Initialiser la carte centrée sur la France
+        var map = L.map('map').setView([46.8, 2.5], 6);
+        
+        // Ajouter le fond de carte
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 18
+        }).addTo(map);
+        
+        // Couleurs selon le statut
+        function getColor(statut) {
+            switch(statut) {
+                case 'attribue_concurrent':
+                    return '#e74c3c'; // Rouge - concurrent
+                case 'attribue_SNCF':
+                    return '#3498db'; // Bleu - SNCF
+                case 'mis_en_concurrence_pas_attribue':
+                    return '#f39c12'; // Orange - en cours
+                default:
+                    return '#95a5a6'; // Gris
+            }
+        }
+        
+        // Style des lignes
+        function style(feature) {
+            return {
+                color: getColor(feature.properties.statut),
+                weight: 3,
+                opacity: 0.8
+            };
+        }
+        
+        // Popup au survol
+        function highlightFeature(e) {
+            var layer = e.target;
+            layer.setStyle({
+                weight: 5,
+                opacity: 1
+            });
+            info.update(layer.feature.properties);
+        }
+        
+        function resetHighlight(e) {
+            geojsonLayer.resetStyle(e.target);
+            info.update();
+        }
+        
+        function onEachFeature(feature, layer) {
+            layer.on({
+                mouseover: highlightFeature,
+                mouseout: resetHighlight
+            });
+            
+            // Popup au clic
+            var popupContent = '<div style="font-size: 13px;">';
+            popupContent += '<strong>' + feature.properties.relation + '</strong><br>';
+            popupContent += '<em>' + feature.properties.libelle_ligne + '</em><br><br>';
+            popupContent += '<strong>Région:</strong> ' + feature.properties.region + '<br>';
+            popupContent += '<strong>Lot:</strong> ' + feature.properties.lot + '<br>';
+            popupContent += '<strong>Statut:</strong> ' + formatStatut(feature.properties.statut) + '<br>';
+            if (feature.properties.operateur) {
+                popupContent += '<strong>Opérateur:</strong> ' + feature.properties.operateur + '<br>';
+            }
+            popupContent += '<strong>Type:</strong> ' + feature.properties.type_marche + '<br>';
+            popupContent += '</div>';
+            
+            layer.bindPopup(popupContent);
+        }
+        
+        function formatStatut(statut) {
+            switch(statut) {
+                case 'attribue_concurrent':
+                    return '✓ Attribué à un concurrent';
+                case 'attribue_SNCF':
+                    return '✓ Attribué à SNCF';
+                case 'mis_en_concurrence_pas_attribue':
+                    return '⏳ Mis en concurrence (pas encore attribué)';
+                default:
+                    return statut;
+            }
+        }
+        
+        // Contrôle d'info
+        var info = L.control();
+        
+        info.onAdd = function (map) {
+            this._div = L.DomUtil.create('div', 'info');
+            this.update();
+            return this._div;
+        };
+        
+        info.update = function (props) {
+            this._div.innerHTML = '<h4>Ligne ferroviaire</h4>' + (props ?
+                '<strong>' + props.relation + '</strong><br>' +
+                formatStatut(props.statut) + '<br>' +
+                '<em style="color: #7f8c8d; font-size: 11px;">Survolez pour voir les détails</em>'
+                : '<em style="color: #7f8c8d;">Survolez une ligne</em>');
+        };
+        
+        info.addTo(map);
+        
+        // Légende
+        var legend = L.control({position: 'topright'});
+        
+        legend.onAdd = function (map) {
+            var div = L.DomUtil.create('div', 'legend');
+            div.innerHTML = '<h4>Statut des lignes</h4>';
+            
+            var statuts = [
+                {value: 'attribue_concurrent', label: 'Attribué à un concurrent'},
+                {value: 'mis_en_concurrence_pas_attribue', label: 'Mis en concurrence'},
+                {value: 'attribue_SNCF', label: 'Attribué à SNCF'}
+            ];
+            
+            for (var i = 0; i < statuts.length; i++) {
+                div.innerHTML +=
+                    '<div class="item"><i style="background:' + getColor(statuts[i].value) + '"></i> ' +
+                    statuts[i].label + '</div>';
+            }
+            
+            return div;
+        };
+        
+        legend.addTo(map);
+        
+        // Charger le GeoJSON
+        var geojsonLayer;
+        
+        fetch('etat_lignes_carte.geojson')
+            .then(response => response.json())
+            .then(data => {
+                // Calculer les statistiques
+                var stats = {
+                    total: data.features.length,
+                    concurrent: 0,
+                    sncf: 0,
+                    en_cours: 0
+                };
+                
+                data.features.forEach(function(feature) {
+                    switch(feature.properties.statut) {
+                        case 'attribue_concurrent':
+                            stats.concurrent++;
+                            break;
+                        case 'attribue_SNCF':
+                            stats.sncf++;
+                            break;
+                        case 'mis_en_concurrence_pas_attribue':
+                            stats.en_cours++;
+                            break;
+                    }
+                });
+                
+                // Ajouter les statistiques
+                var statsDiv = L.DomUtil.create('div', 'stats');
+                statsDiv.innerHTML = '<h4>📊 Statistiques</h4>' +
+                    '<div class="stat-item"><span>Total de lignes:</span><span class="stat-value">' + stats.total + '</span></div>' +
+                    '<div class="stat-item"><span>Concurrent:</span><span class="stat-value" style="color: #e74c3c;">' + stats.concurrent + '</span></div>' +
+                    '<div class="stat-item"><span>SNCF:</span><span class="stat-value" style="color: #3498db;">' + stats.sncf + '</span></div>' +
+                    '<div class="stat-item"><span>En cours:</span><span class="stat-value" style="color: #f39c12;">' + stats.en_cours + '</span></div>';
+                
+                document.body.appendChild(statsDiv);
+                
+                // Ajouter le GeoJSON à la carte
+                geojsonLayer = L.geoJSON(data, {
+                    style: style,
+                    onEachFeature: onEachFeature
+                }).addTo(map);
+                
+                // Ajuster la vue sur toutes les lignes
+                map.fitBounds(geojsonLayer.getBounds());
+            })
+            .catch(error => {
+                console.error('Erreur lors du chargement du GeoJSON:', error);
+                alert('Erreur lors du chargement des données. Assurez-vous que le fichier etat_lignes_carte.geojson est dans le même dossier.');
+            });
+    </script>
+</body>
+</html>
