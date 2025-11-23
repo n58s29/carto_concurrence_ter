@@ -14,6 +14,23 @@ import socketserver
 import sys
 import os
 
+class GeoJSONHandler(http.server.SimpleHTTPRequestHandler):
+    """Handler personnalisé pour gérer correctement les types MIME GeoJSON"""
+
+    def end_headers(self):
+        # Ajouter les headers CORS pour éviter les problèmes de sécurité
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        super().end_headers()
+
+    def guess_type(self, path):
+        """Override pour ajouter le type MIME pour GeoJSON"""
+        mimetype = super().guess_type(path)
+        if path.endswith('.geojson'):
+            return 'application/geo+json'
+        return mimetype
+
 def main():
     # Port par défaut
     PORT = 8000
@@ -29,8 +46,8 @@ def main():
     # Changer le répertoire de travail au dossier du script
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-    # Créer le serveur
-    Handler = http.server.SimpleHTTPRequestHandler
+    # Créer le serveur avec notre handler personnalisé
+    Handler = GeoJSONHandler
 
     # Activer la réutilisation de l'adresse pour éviter les erreurs "Address already in use"
     socketserver.TCPServer.allow_reuse_address = True
