@@ -17,6 +17,62 @@
             bottom: 0;
             width: 100%;
         }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2000;
+            background: white;
+            padding: 30px 50px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        .loading h3 {
+            margin: 0 0 15px;
+            color: #2c3e50;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2000;
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            max-width: 500px;
+        }
+        .error h3 {
+            margin: 0 0 15px;
+            color: #856404;
+        }
+        .error p {
+            margin: 10px 0;
+            color: #856404;
+        }
+        .error code {
+            background: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
         .info {
             padding: 6px 8px;
             background: white;
@@ -114,7 +170,12 @@
         <h1>🚆 Ouverture à la concurrence du rail français</h1>
         <p>Lignes TER et TET (hors Île-de-France et Corse) - Source: Contexte, 17/11/2025</p>
     </div>
-    
+
+    <div id="loading" class="loading">
+        <h3>Chargement des données...</h3>
+        <div class="spinner"></div>
+    </div>
+
     <div id="map"></div>
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -248,8 +309,16 @@
         var geojsonLayer;
         
         fetch('etat_lignes_carte.geojson')
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erreur HTTP: ' + response.status);
+                }
+                return response.json();
+            })
             .then(data => {
+                // Masquer l'indicateur de chargement
+                document.getElementById('loading').style.display = 'none';
+
                 // Calculer les statistiques
                 var stats = {
                     total: data.features.length,
@@ -257,7 +326,7 @@
                     sncf: 0,
                     en_cours: 0
                 };
-                
+
                 data.features.forEach(function(feature) {
                     switch(feature.properties.statut) {
                         case 'attribue_concurrent':
@@ -271,7 +340,7 @@
                             break;
                     }
                 });
-                
+
                 // Ajouter les statistiques
                 var statsDiv = L.DomUtil.create('div', 'stats');
                 statsDiv.innerHTML = '<h4>📊 Statistiques</h4>' +
@@ -279,21 +348,40 @@
                     '<div class="stat-item"><span>Concurrent:</span><span class="stat-value" style="color: #e74c3c;">' + stats.concurrent + '</span></div>' +
                     '<div class="stat-item"><span>SNCF:</span><span class="stat-value" style="color: #3498db;">' + stats.sncf + '</span></div>' +
                     '<div class="stat-item"><span>En cours:</span><span class="stat-value" style="color: #f39c12;">' + stats.en_cours + '</span></div>';
-                
+
                 document.body.appendChild(statsDiv);
-                
+
                 // Ajouter le GeoJSON à la carte
                 geojsonLayer = L.geoJSON(data, {
                     style: style,
                     onEachFeature: onEachFeature
                 }).addTo(map);
-                
+
                 // Ajuster la vue sur toutes les lignes
                 map.fitBounds(geojsonLayer.getBounds());
             })
             .catch(error => {
                 console.error('Erreur lors du chargement du GeoJSON:', error);
-                alert('Erreur lors du chargement des données. Assurez-vous que le fichier etat_lignes_carte.geojson est dans le même dossier.');
+
+                // Masquer l'indicateur de chargement
+                document.getElementById('loading').style.display = 'none';
+
+                // Afficher un message d'erreur détaillé
+                var errorDiv = document.createElement('div');
+                errorDiv.className = 'error';
+                errorDiv.innerHTML = '<h3>⚠️ Erreur de chargement</h3>' +
+                    '<p><strong>Impossible de charger les données GeoJSON.</strong></p>' +
+                    '<p>Si vous ouvrez ce fichier directement (protocole <code>file://</code>), ' +
+                    'les navigateurs bloquent le chargement de fichiers locaux pour des raisons de sécurité.</p>' +
+                    '<p><strong>Solution:</strong> Utilisez un serveur HTTP local.</p>' +
+                    '<p>Depuis le dossier du projet, lancez:</p>' +
+                    '<p><code>python3 server.py</code></p>' +
+                    '<p>ou</p>' +
+                    '<p><code>python -m http.server 8000</code></p>' +
+                    '<p>Puis ouvrez <code>http://localhost:8000</code> dans votre navigateur.</p>' +
+                    '<p style="font-size: 11px; margin-top: 15px; color: #666;">Erreur technique: ' + error.message + '</p>';
+
+                document.body.appendChild(errorDiv);
             });
     </script>
 </body>

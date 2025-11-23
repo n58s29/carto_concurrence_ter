@@ -1,0 +1,45 @@
+# Fichiers système
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Fichiers de sauvegarde
+*~
+*.bak
+*.swp
+*.swo
+
+# Dossiers de développement
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.env
+
+# Logs
+*.log
+logs/
+
+# Fichiers temporaires
+*.tmp
+*.temp
+.cache/
+
+# Node modules (si jamais utilisé)
+node_modules/
+npm-debug.log
+
+# Distribution / Build
+dist/
+build/
+*.egg-info/
